@@ -1,4 +1,4 @@
-# 🎯 Me-Trade: Quick Reference
+# 🎯 Me Trade: Quick Reference
 
 ## 🚀 One-Command Start
 

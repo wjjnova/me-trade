@@ -1,11 +1,16 @@
-# Me-Trade Configuration
+# Me Trade Configuration
 import os
+from pathlib import Path
+
+
+# Resolve project root one level above the src package
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Database
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "metrade.db")
+DB_PATH = str(BASE_DIR / "data" / "metrade.db")
 
 # File storage
-FILES_DIR = os.path.join(os.path.dirname(__file__), "files")
+FILES_DIR = str(BASE_DIR / "files")
 
 # Default symbols for initial download
 DEFAULT_SYMBOLS = [

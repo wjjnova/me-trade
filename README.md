@@ -1,4 +1,4 @@
-# Me-Trade
+# Me Trade
 
 **Natural Language-Driven Backtesting and Analysis App Using Backtrader**
 
@@ -8,7 +8,7 @@ A lightweight application for testing trading strategies using U.S. stock and op
 
 ## 📋 Overview
 
-**Me-Trade** enables you to:
+**Me Trade** enables you to:
 
 - 📝 Describe trading strategies in plain English or Chinese
 - 📊 Download and cache stock/option data from Yahoo Finance
@@ -45,6 +45,31 @@ A lightweight application for testing trading strategies using U.S. stock and op
    pip install -r requirements.txt
    ```
 
+4. **Install Dolt and download the options dataset** *(recommended for options backtesting)*:
+  ```bash
+  brew install dolt
+  cd data
+  dolt clone post-no-preference/options
+  cd options
+  dolt dump -r csv
+  ```
+
+  Verify your installation with a sample query:
+  ```bash
+  dolt sql -q "SELECT * FROM option_chain WHERE act_symbol = 'TSLA' LIMIT 3"
+  ```
+
+  Sample output:
+  ```text
+  +------------+------------+------------+--------+----------+--------+--------+--------+---------+--------+---------+--------+---------+
+  | date       | act_symbol | expiration | strike | call_put | bid    | ask    | vol    | delta   | gamma  | theta   | vega   | rho     |
+  +------------+------------+------------+--------+----------+--------+--------+--------+---------+--------+---------+--------+---------+
+  | 2021-01-01 | TSLA       | 2021-01-15 | 495.00 | Call     | 210.80 | 211.90 | 0.8359 | 0.9853  | 0.0003 | -0.1498 | 0.0532 | 0.1987  |
+  | 2021-01-01 | TSLA       | 2021-01-15 | 495.00 | Put      | 1.02   | 1.08   | 0.8990 | -0.0208 | 0.0004 | -0.2145 | 0.0715 | -0.0065 |
+  | 2021-01-01 | TSLA       | 2021-01-15 | 510.00 | Call     | 196.00 | 197.15 | 0.8098 | 0.9804  | 0.0004 | -0.1857 | 0.0682 | 0.2034  |
+  +------------+------------+------------+--------+----------+--------+--------+--------+---------+--------+---------+--------+---------+
+  ```
+
 ### Running the Application
 
 ```bash
@@ -64,6 +89,7 @@ The app will open in your default browser at `http://localhost:8501`
 - Daily and intraday data (where available)
 - Automatic caching to SQLite
 - Support for custom CSV uploads
+- **NEW: Technical indicator visualization** - View stocks with SMA, EMA, RSI, MACD, Bollinger Bands
 
 **Options:**
 - Current option chains from Yahoo Finance
@@ -229,6 +255,14 @@ Stores calculated performance metrics for each backtest.
 3. Select date range and interval
 4. Click **Download Stock Data**
 5. Optionally download benchmarks (VOO, SPY, QQQ)
+
+**NEW: View Indicators**
+- Switch to **View Indicators** tab
+- Select a symbol and date range
+- Choose indicators (SMA, RSI, MACD, etc.)
+- Click **Load Data** to see interactive charts
+- Download data with indicators as CSV
+- See [INDICATORS_GUIDE.md](INDICATORS_GUIDE.md) for detailed usage
 
 ### Step 2: Create Strategy
 
@@ -399,7 +433,16 @@ Optional column: `adj_close`
 
 ---
 
-## 📚 Dependencies
+## 📚 Documentation
+
+- **[README.md](README.md)** - Main documentation (this file)
+- **[INDICATORS_GUIDE.md](INDICATORS_GUIDE.md)** - Technical indicators visualization guide
+- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Technical implementation details
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick start visual guide
+
+---
+
+## 📦 Dependencies
 
 - **streamlit** - Web UI framework
 - **backtrader** - Backtesting engine

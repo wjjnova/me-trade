@@ -1,16 +1,30 @@
 """
 Natural language to structured strategy parser.
-MVP uses rule-based parsing with stub for future LLM integration.
+Supports both rule-based parsing and LLM-based parsing via OpenAI and Anthropic.
 """
 import re
-from typing import Dict, Any
+import os
+import json
+from typing import Dict, Any, Tuple, Optional
 from src.models import Strategy
 
 
 class NLParser:
     """Parse natural language descriptions into structured strategies."""
     
-    def __init__(self):
+    def __init__(self, use_llm: bool = True, llm_config: Optional[Dict[str, str]] = None):
+        """Initialize parser.
+        
+        Args:
+            use_llm: Whether to use LLM for parsing
+            llm_config: Dict with 'provider', 'model', 'api_key' keys
+        """
+        self.llm_config = llm_config
+        if llm_config:
+            self.use_llm = use_llm
+        else:
+            # Fallback to env variable for backward compatibility
+            self.use_llm = use_llm and os.getenv("OPENAI_API_KEY")
         self.indicator_keywords = {
             'sma': 'SMA',
             'simple moving average': 'SMA',
@@ -147,9 +161,11 @@ class NLParser:
         symbol_pattern = r'\b([A-Z]{1,5})\b'
         matches = re.findall(symbol_pattern, text)
         
-        # Filter out common words
+        # Filter out common words and indicator names
         common_words = {'I', 'A', 'THE', 'AND', 'OR', 'BUT', 'FOR', 'WITH'}
-        symbols = [s for s in matches if s not in common_words]
+        indicator_names = {'SMA', 'EMA', 'RSI', 'MACD', 'BB', 'ATR', 'ADX', 'CCI', 'ROC', 'OBV', 'VWAP'}
+        excluded = common_words | indicator_names
+        symbols = [s for s in matches if s not in excluded]
         
         return symbols[:10] if symbols else ["AAPL"]  # Limit to 10 symbols
     
@@ -248,17 +264,208 @@ class NLParser:
             return name
         return "Natural Language Strategy"
     
-    def parse_with_llm(self, text: str) -> Dict[str, Any]:
-        """Parse using LLM (future implementation).
+    def parse_with_llm(self, text: str) -> Tuple[str, Dict[str, Any], str]:
+        """Parse using LLM to generate all three strategy formats.
         
-        This is a stub for future LLM integration.
+        This method calls OpenAI or Anthropic API to convert natural language into:
+        1. Human-readable strategy description
+        2. Structured JSON strategy definition
+        3. Backtrader Python code
         
         Args:
             text: Natural language strategy description
             
         Returns:
-            Structured strategy dictionary
+            Tuple of (human_readable, strategy_dict, backtrader_code)
         """
-        # TODO: Integrate with OpenAI/Anthropic/other LLM
-        # For now, fall back to rule-based parsing
-        return self.parse(text)
+        if not self.use_llm:
+            # Fall back to rule-based parsing
+            return self._fallback_parsing(text)
+        
+        # Determine which LLM provider to use
+        if self.llm_config:
+            provider = self.llm_config.get('provider', 'openai')
+            if provider == 'anthropic':
+                return self._parse_with_anthropic(text)
+            else:
+                return self._parse_with_openai(text)
+        else:
+            # Backward compatibility: use OpenAI from env
+            return self._parse_with_openai(text)
+    
+    def _fallback_parsing(self, text: str) -> Tuple[str, Dict[str, Any], str]:
+        """Fallback to rule-based parsing."""
+        strategy_dict = self.parse(text)
+        from src.strategy import StrategyCompiler
+        compiler = StrategyCompiler()
+        backtrader_code = compiler.compile(strategy_dict)
+        human_readable = self._generate_human_readable(strategy_dict)
+        return human_readable, strategy_dict, backtrader_code
+    
+    def _get_system_prompt(self) -> str:
+        """Get the system prompt for LLM parsing."""
+        return """You are an expert trading strategy converter. Convert natural language trading strategies into three formats:
+
+1. HUMAN_READABLE: A clear, structured description of the strategy in plain English
+2. JSON: A structured JSON strategy definition following this schema:
+{
+  "name": "Strategy Name",
+  "universe": ["SYMBOL1", "SYMBOL2"],
+  "timeframe": {
+    "start": "YYYY-MM-DD",
+    "end": "YYYY-MM-DD",
+    "interval": "1d"
+  },
+  "entry": [
+    {
+      "type": "indicator",
+      "ind": "SMA|EMA|RSI|MACD|BBANDS",
+      "period": number,
+      "op": ">|<|>=|<=|==",
+      "rhs": number or {"ind": "...", "period": number}
+    }
+  ],
+  "exit": [
+    {
+      "type": "trailing_stop|take_profit|stop_loss",
+      "percent": 0.08
+    }
+  ],
+  "position": {
+    "sizing": "percent_cash|fixed",
+    "value": 0.25,
+    "max_positions": 4
+  },
+  "costs": {
+    "commission_per_share": 0.005,
+    "slippage_bps": 5
+  }
+}
+
+3. BACKTRADER_CODE: Complete Backtrader strategy class in Python that uses pre-calculated indicators from data feed (e.g., self.data.sma_20, self.data.rsi_14)
+
+Return your response in this exact JSON format:
+{
+  "human_readable": "...",
+  "json_strategy": {...},
+  "backtrader_code": "..."
+}"""
+    
+    def _parse_with_openai(self, text: str) -> Tuple[str, Dict[str, Any], str]:
+        """Parse using OpenAI API."""
+        try:
+            import openai
+            
+            # Get API key and model
+            if self.llm_config:
+                api_key = self.llm_config.get('api_key')
+                model = self.llm_config.get('model', 'gpt-4')
+            else:
+                api_key = os.getenv("OPENAI_API_KEY")
+                model = "gpt-4"
+            
+            openai.api_key = api_key
+            
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "user", "content": f"Convert this trading strategy:\n\n{text}"}
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+            
+            result = json.loads(response.choices[0].message.content)
+            
+            return (
+                result["human_readable"],
+                result["json_strategy"],
+                result["backtrader_code"]
+            )
+            
+        except Exception as e:
+            print(f"OpenAI parsing failed: {e}, falling back to rule-based parsing")
+            return self._fallback_parsing(text)
+    
+    def _parse_with_anthropic(self, text: str) -> Tuple[str, Dict[str, Any], str]:
+        """Parse using Anthropic Claude API."""
+        try:
+            import anthropic
+            
+            # Get API key and model
+            api_key = self.llm_config.get('api_key')
+            model = self.llm_config.get('model', 'claude-3-5-sonnet-20241022')
+            
+            client = anthropic.Anthropic(api_key=api_key)
+            
+            response = client.messages.create(
+                model=model,
+                max_tokens=2000,
+                temperature=0.3,
+                system=self._get_system_prompt(),
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Convert this trading strategy:\n\n{text}"
+                    }
+                ]
+            )
+            
+            # Extract text from response
+            result_text = response.content[0].text
+            result = json.loads(result_text)
+            
+            return (
+                result["human_readable"],
+                result["json_strategy"],
+                result["backtrader_code"]
+            )
+            
+        except Exception as e:
+            print(f"Anthropic parsing failed: {e}, falling back to rule-based parsing")
+            return self._fallback_parsing(text)
+    
+    def _generate_human_readable(self, strategy_dict: Dict[str, Any]) -> str:
+        """Generate human-readable description from strategy dictionary.
+        
+        Args:
+            strategy_dict: Structured strategy dictionary
+            
+        Returns:
+            Human-readable strategy description
+        """
+        lines = []
+        lines.append(f"Strategy: {strategy_dict.get('name', 'Unnamed Strategy')}")
+        lines.append(f"\nTrading Universe: {', '.join(strategy_dict.get('universe', []))}")
+        
+        timeframe = strategy_dict.get('timeframe', {})
+        lines.append(f"Timeframe: {timeframe.get('start')} to {timeframe.get('end')} ({timeframe.get('interval')})")
+        
+        lines.append("\nEntry Conditions:")
+        for i, condition in enumerate(strategy_dict.get('entry', []), 1):
+            if condition['type'] == 'indicator':
+                ind_desc = f"{condition['ind']}({condition.get('period', '')})"
+                rhs = condition.get('rhs', '')
+                if isinstance(rhs, dict):
+                    rhs_desc = f"{rhs['ind']}({rhs.get('period', '')})"
+                else:
+                    rhs_desc = str(rhs)
+                lines.append(f"  {i}. {ind_desc} {condition.get('op', '')} {rhs_desc}")
+        
+        lines.append("\nExit Conditions:")
+        for i, condition in enumerate(strategy_dict.get('exit', []), 1):
+            exit_type = condition.get('type', '').replace('_', ' ').title()
+            percent = condition.get('percent', 0) * 100
+            lines.append(f"  {i}. {exit_type}: {percent:.1f}%")
+        
+        position = strategy_dict.get('position', {})
+        lines.append(f"\nPosition Sizing: {position.get('sizing', 'percent_cash')} at {position.get('value', 0.25)*100:.0f}%")
+        lines.append(f"Max Positions: {position.get('max_positions', 4)}")
+        
+        costs = strategy_dict.get('costs', {})
+        lines.append(f"\nCosts:")
+        lines.append(f"  Commission: ${costs.get('commission_per_share', 0.005):.4f} per share")
+        lines.append(f"  Slippage: {costs.get('slippage_bps', 5)} basis points")
+        
+        return '\n'.join(lines)

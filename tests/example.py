@@ -15,7 +15,7 @@ def main():
     """Run end-to-end example."""
     
     print("=" * 60)
-    print("Me-Trade: End-to-End Example")
+    print("Me Trade: End-to-End Example")
     print("=" * 60)
     
     # Initialize components

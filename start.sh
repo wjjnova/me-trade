@@ -1,7 +1,7 @@
 #!/bin/bash
-# Quick start script for Me-Trade
+# Quick start script for Me Trade
 
-echo "🚀 Me-Trade Quick Start"
+echo "🚀 Me Trade Quick Start"
 echo "======================="
 echo ""
 

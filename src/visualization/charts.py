@@ -57,6 +57,112 @@ class ChartGenerator:
         )
         
         return fig
+
+    def equity_trend_chart(
+        self,
+        equity_df: pd.DataFrame,
+        title: str = "Equity Trend"
+    ) -> go.Figure:
+        """Create equity curve chart highlighting gain/loss points.
+
+        Args:
+            equity_df: DataFrame with date, value, and return_pct columns
+            title: Chart title
+
+        Returns:
+            Plotly figure
+        """
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=equity_df['date'],
+            y=equity_df['value'],
+            mode='lines',
+            name='Portfolio Value',
+            line=dict(color='#1f77b4', width=2)
+        ))
+
+        if 'return_pct' in equity_df.columns:
+            gain_mask = equity_df['return_pct'] >= 0
+            loss_mask = ~gain_mask
+
+            if gain_mask.any():
+                gain_df = equity_df[gain_mask]
+                fig.add_trace(go.Scatter(
+                    x=gain_df['date'],
+                    y=gain_df['value'],
+                    mode='markers',
+                    name='Gain',
+                    marker=dict(color='#2e7d32', symbol='triangle-up', size=9),
+                    hovertemplate=(
+                        "Date: %{x}<br>Value: $%{y:,.2f}<br>Daily Return: %{customdata:.2f}%<extra></extra>"
+                    ),
+                    customdata=gain_df['return_pct'] * 100
+                ))
+
+            if loss_mask.any():
+                loss_df = equity_df[loss_mask]
+                fig.add_trace(go.Scatter(
+                    x=loss_df['date'],
+                    y=loss_df['value'],
+                    mode='markers',
+                    name='Loss',
+                    marker=dict(color='#c62828', symbol='triangle-down', size=9),
+                    hovertemplate=(
+                        "Date: %{x}<br>Value: $%{y:,.2f}<br>Daily Return: %{customdata:.2f}%<extra></extra>"
+                    ),
+                    customdata=loss_df['return_pct'] * 100
+                ))
+
+        fig.update_layout(
+            title=title,
+            xaxis_title="Date",
+            yaxis_title="Portfolio Value ($)",
+            hovermode='x unified',
+            template='plotly_white',
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+        )
+
+        return fig
+
+    def daily_returns_bar_chart(
+        self,
+        equity_df: pd.DataFrame,
+        title: str = "Daily Gain/Loss"
+    ) -> go.Figure:
+        """Create bar chart for daily returns showing gains vs losses.
+
+        Args:
+            equity_df: DataFrame with date and return_pct columns
+            title: Chart title
+
+        Returns:
+            Plotly figure
+        """
+        if 'return_pct' not in equity_df.columns:
+            raise ValueError("equity_df must include a 'return_pct' column")
+
+        colors = equity_df['return_pct'].apply(
+            lambda val: '#2e7d32' if val >= 0 else '#c62828'
+        )
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=equity_df['date'],
+            y=equity_df['return_pct'] * 100,
+            marker=dict(color=colors),
+            name='Daily Return',
+            hovertemplate="Date: %{x}<br>Return: %{y:.2f}%<extra></extra>"
+        ))
+
+        fig.update_layout(
+            title=title,
+            xaxis_title="Date",
+            yaxis_title="Return (%)",
+            template='plotly_white'
+        )
+
+        return fig
     
     def drawdown_chart(
         self,
@@ -304,3 +410,177 @@ class ChartGenerator:
         )
         
         return fig
+    
+    def candlestick_chart(
+        self,
+        data: pd.DataFrame,
+        indicators: Optional[pd.DataFrame] = None,
+        title: str = "K-Line Chart",
+        show_volume: bool = True
+    ) -> go.Figure:
+        """Create candlestick (K-line) chart with optional indicators.
+        
+        Args:
+            data: DataFrame with date, open, high, low, close, volume columns
+            indicators: Optional DataFrame with indicator columns (SMA, RSI, etc.)
+            title: Chart title
+            show_volume: Whether to show volume subplot
+            
+        Returns:
+            Plotly figure with candlestick chart and optional volume/indicators
+        """
+        from plotly.subplots import make_subplots
+        
+        # Determine number of subplots
+        num_rows = 1
+        row_heights = [0.7]
+        subplot_titles = [title]
+        
+        if show_volume and 'volume' in data.columns:
+            num_rows += 1
+            row_heights.append(0.3)
+            subplot_titles.append('Volume')
+        
+        # Create subplots
+        fig = make_subplots(
+            rows=num_rows,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.03,
+            row_heights=row_heights,
+            subplot_titles=subplot_titles
+        )
+        
+        # Add candlestick chart
+        fig.add_trace(
+            go.Candlestick(
+                x=data['date'],
+                open=data['open'],
+                high=data['high'],
+                low=data['low'],
+                close=data['close'],
+                name='OHLC',
+                increasing=dict(line=dict(color='#26a69a')),  # Green
+                decreasing=dict(line=dict(color='#ef5350'))   # Red
+            ),
+            row=1, col=1
+        )
+        
+        # Add indicators if provided
+        if indicators is not None and not indicators.empty:
+            # Add moving averages
+            if 'SMA_20' in indicators.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=indicators['date'],
+                        y=indicators['SMA_20'],
+                        name='SMA 20',
+                        line=dict(color='orange', width=1)
+                    ),
+                    row=1, col=1
+                )
+            
+            if 'SMA_50' in indicators.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=indicators['date'],
+                        y=indicators['SMA_50'],
+                        name='SMA 50',
+                        line=dict(color='blue', width=1)
+                    ),
+                    row=1, col=1
+                )
+            
+            if 'SMA_200' in indicators.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=indicators['date'],
+                        y=indicators['SMA_200'],
+                        name='SMA 200',
+                        line=dict(color='red', width=1)
+                    ),
+                    row=1, col=1
+                )
+            
+            # Add Bollinger Bands
+            if 'BB_Upper' in indicators.columns and 'BB_Lower' in indicators.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=indicators['date'],
+                        y=indicators['BB_Upper'],
+                        name='BB Upper',
+                        line=dict(color='gray', width=1, dash='dot'),
+                        showlegend=True
+                    ),
+                    row=1, col=1
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=indicators['date'],
+                        y=indicators['BB_Lower'],
+                        name='BB Lower',
+                        line=dict(color='gray', width=1, dash='dot'),
+                        fill='tonexty',
+                        fillcolor='rgba(128,128,128,0.1)',
+                        showlegend=False
+                    ),
+                    row=1, col=1
+                )
+        
+        # Add volume bars if requested
+        if show_volume and 'volume' in data.columns:
+            colors = ['red' if close < open else 'green' 
+                     for close, open in zip(data['close'], data['open'])]
+            
+            fig.add_trace(
+                go.Bar(
+                    x=data['date'],
+                    y=data['volume'],
+                    name='Volume',
+                    marker=dict(color=colors),
+                    showlegend=False
+                ),
+                row=2, col=1
+            )
+        
+        # Update layout
+        fig.update_layout(
+            height=600 if show_volume else 500,
+            xaxis_rangeslider_visible=False,
+            hovermode='x unified',
+            template='plotly_white'
+        )
+        
+        fig.update_yaxes(title_text="Price", row=1, col=1)
+        if show_volume:
+            fig.update_yaxes(title_text="Volume", row=2, col=1)
+        
+        return fig
+    
+    @staticmethod
+    def resample_ohlcv(data: pd.DataFrame, timeframe: str = 'W') -> pd.DataFrame:
+        """Resample OHLCV data to different timeframe.
+        
+        Args:
+            data: DataFrame with date, open, high, low, close, volume columns
+            timeframe: Resample frequency ('D'=day, 'W'=week, 'M'=month, 'Q'=quarter)
+            
+        Returns:
+            Resampled DataFrame
+        """
+        df = data.copy()
+        df['date'] = pd.to_datetime(df['date'])
+        df.set_index('date', inplace=True)
+        
+        # Define aggregation rules
+        resampled = df.resample(timeframe).agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+        
+        resampled.reset_index(inplace=True)
+        
+        return resampled

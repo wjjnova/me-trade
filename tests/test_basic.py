@@ -1,5 +1,5 @@
 """
-Basic tests for Me-Trade functionality.
+Basic tests for Me Trade functionality.
 Run with: python -m pytest tests/
 """
 import pytest
