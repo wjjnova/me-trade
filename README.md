@@ -183,41 +183,30 @@ Strategies are represented as JSON:
 
 ```
 me-trade/
-├── app.py                      # Main Streamlit app
-├── config.py                   # Configuration settings
+├── app.py                      # Main Streamlit entry point
 ├── requirements.txt            # Python dependencies
 ├── data/                       # SQLite database storage
 │   └── metrade.db
 ├── files/                      # Exported artifacts (CSV, JSON)
+├── doc/                        # User & engineering guides (Markdown)
+├── spec/                       # Product/spec documents
 ├── pages/                      # Streamlit multi-page app
 │   ├── 1_Data.py              # Data management page
 │   ├── 2_Strategy_Builder.py  # Strategy creation page
 │   ├── 3_Backtest.py          # Backtest execution page
-│   └── 4_Results.py           # Results visualization page
-└── src/                       # Core modules
-    ├── db/                    # Database layer
-    │   ├── __init__.py
-    │   └── schema.py          # SQLite schema and operations
-    ├── data/                  # Data sourcing
-    │   ├── __init__.py
-    │   ├── stocks.py          # Stock data manager
-    │   ├── options.py         # Options data manager
-    │   └── benchmarks.py      # Benchmark data manager
-    ├── models/                # Pydantic models
-    │   ├── __init__.py
-    │   └── strategy.py        # Strategy, Backtest models
-    ├── strategy/              # Strategy processing
-    │   ├── __init__.py
-    │   ├── nl_parser.py       # Natural language parser
-    │   ├── compiler.py        # Code generator
-    │   └── validator.py       # Code safety validator
-    ├── backtest/              # Backtesting engine
-    │   ├── __init__.py
-    │   ├── engine.py          # Backtrader execution
-    │   └── metrics.py         # Performance calculations
-    └── visualization/         # Charts and plots
-        ├── __init__.py
-        └── charts.py          # Plotly chart generators
+│   ├── 4_Results.py           # Results visualization page
+│   └── 5_Settings.py          # LLM configuration & settings
+├── src/                       # Core modules
+│   ├── __init__.py
+│   ├── config.py              # Configuration settings
+│   ├── backtest/              # Backtesting engine
+│   ├── data/                  # Data sourcing & indicators
+│   ├── db/                    # Database layer
+│   ├── models/                # Pydantic models
+│   ├── strategy/              # Strategy parsing/compilation
+│   ├── ui/                    # Localization helpers
+│   └── visualization/         # Plotly chart generators
+└── tests/                     # Test suites & debug scripts
 ```
 
 ---
@@ -262,7 +251,7 @@ Stores calculated performance metrics for each backtest.
 - Choose indicators (SMA, RSI, MACD, etc.)
 - Click **Load Data** to see interactive charts
 - Download data with indicators as CSV
-- See [INDICATORS_GUIDE.md](INDICATORS_GUIDE.md) for detailed usage
+- See [doc/INDICATORS_GUIDE.md](doc/INDICATORS_GUIDE.md) for detailed usage
 
 ### Step 2: Create Strategy
 
@@ -302,14 +291,25 @@ Stores calculated performance metrics for each backtest.
 
 ## ⚙️ Configuration
 
-Edit `config.py` to customize:
+Edit `src/config.py` to customize:
 
 ```python
+from pathlib import Path
+
+# Resolve project root one level above src/
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 # Database path
-DB_PATH = "data/metrade.db"
+DB_PATH = str(BASE_DIR / "data" / "metrade.db")
+
+# File storage
+FILES_DIR = str(BASE_DIR / "files")
 
 # Default symbols
-DEFAULT_SYMBOLS = ["MSFT", "AAPL", "GOOGL", ...]
+DEFAULT_SYMBOLS = [
+  "MSFT", "PATH", "GOOGL", "TSLA", "COST",
+  "NVDA", "META", "NFLX", "AMZN", "VOO", "AAPL", "BABA"
+]
 
 # Benchmark symbols
 BENCHMARK_SYMBOLS = ["VOO", "SPY", "QQQ"]
@@ -436,9 +436,9 @@ Optional column: `adj_close`
 ## 📚 Documentation
 
 - **[README.md](README.md)** - Main documentation (this file)
-- **[INDICATORS_GUIDE.md](INDICATORS_GUIDE.md)** - Technical indicators visualization guide
-- **[IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)** - Technical implementation details
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick start visual guide
+- **[doc/INDICATORS_GUIDE.md](doc/INDICATORS_GUIDE.md)** - Technical indicators visualization guide
+- **[doc/IMPLEMENTATION_SUMMARY.md](doc/IMPLEMENTATION_SUMMARY.md)** - Technical implementation details
+- **[doc/QUICK_REFERENCE.md](doc/QUICK_REFERENCE.md)** - Quick start visual guide
 
 ---
 
